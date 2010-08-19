@@ -1,0 +1,2 @@
+native2ascii org.nt org1.nt
+sed -e 's/\\u00a/\\u00A/g; s/\\u041a/\\u041A/g; s/\\u041b/\\u041B/g; s/\\u041c/\\u041C/g; s/\\u041d/\\u041D/g; s/\\u041e/\\u041E/g; s/\\u041f/\\u041F/g; s/\\u042a/\\u042A/g; s/\\u042b/\\u042B/g; s/\\u042c/\\u042C/g; s/\\u042d/\\u042D/g; s/\\u042e/\\u042E/g; s/\\u042f/\\u042F/g; s/\\u043a/\\u043A/g; s/\\u043b/\\u043B/g; s/\\u043c/\\u043C/g; s/\\u043d/\\u043D/g; s/\\u043e/\\u043E/g; s/\\u043f/\\u043F/g; s/\\u044a/\\u044A/g; s/\\u044b/\\u044B/g; s/\\u044c/\\u044C/g; s/\\u044d/\\u044D/g; s/\\u044e/\\u044E/g; s/\\u044f/\\u044F/g;' org1.nt > org2.nt
