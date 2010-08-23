@@ -15,7 +15,8 @@ import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.QueueingConsumer.Delivery;
 //import com.rabbitmq.client.GetResponse;
 
-public class AMQPMessagingManager implements IMessagingManager {
+public class AMQPMessagingManager
+{
     //AMQP
 
     private Connection connection;
@@ -29,13 +30,13 @@ public class AMQPMessagingManager implements IMessagingManager {
     private Channel channel_get_message = null;
     private QueueingConsumer consumer = null;
 
-    private TripleUtils tripleUtils = new TripleUtils();
-
-    public AMQPMessagingManager() {
+    public AMQPMessagingManager()
+    {
     }
 
     synchronized public void init(String host, Integer port, String virtualHost, String userName, String password,
-            long responceWaitingLimit) throws Exception {
+            long responceWaitingLimit) throws Exception
+    {
         this.host = host;
         this.port = port;
         this.virtualHost = virtualHost;
@@ -56,8 +57,10 @@ public class AMQPMessagingManager implements IMessagingManager {
      * 
      * @throws IOException
      */
-    synchronized public void sendMessage(String to, String message) {
-        try {
+    synchronized public void sendMessage(String to, String message)
+    {
+        try
+        {
             //	    long start = System.nanoTime();
 
 //	    channel.queueDeclare(to);
@@ -76,150 +79,21 @@ public class AMQPMessagingManager implements IMessagingManager {
             log.trace(traceMessage);
             }*/
 
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             e.printStackTrace();
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    synchronized public List<String> sendRequest(String uid, String to, String message,
-            boolean withWaitingLimit) throws RuntimeException {
-        long start = System.nanoTime();
-
-        System.out.println(String.format("%s SEND_REQUEST [%s] : START : Подготовлен пакет для получателя '%s'. Содержимое \n[\n%s\n]\n", ((System.nanoTime() - start) / 1000), uid, to, message));
-
-        List<String> result = new ArrayList();
-        String tempQueue = String.format("client-%s", uid);
-        Channel channel = null;
-
-        try {
-            channel = getConnection().createChannel();
-
-            channel.queueDeclare(tempQueue, true);
-
-            Map<String, Object> headers = new HashMap<String, Object>();
-            headers.put("sender", tempQueue);
-            String setFromUid = java.util.UUID.randomUUID().toString();
-            message = String.format("%s<%s><%s><%s>.<%s><%s>\"%s\".<%s><%s>\"%s\".", message, setFromUid, Predicates.SUBJECT, Predicates.SET_FROM,
-                    setFromUid, Predicates.FUNCTION_ARGUMENT, tempQueue, uid, Predicates.REPLY_TO, tempQueue);
-
-            System.out.println(String.format("%s SEND_REQUEST [%s] : Создана временная очередь для приема ответа '%s'", ((System.nanoTime() - start) / 1000), uid, tempQueue));
-
-            // отправляем пакет
-            BasicProperties props = new BasicProperties();
-            props.setHeaders(headers);
-
-            channel.basicPublish("", to, props, message.getBytes());
-
-            System.out.println(String.format("%s SEND_REQUEST [%s] : Пакет отправлен. Время ожидания ответа %s", ((System.nanoTime() - start) / 1000), uid, String.valueOf(responceWaitingLimit)));
-
-            Delivery delivery = null;
-            QueueingConsumer consumer = new QueueingConsumer(channel);
-            channel.basicConsume(tempQueue, consumer);
-
-            /*	    long deliveryTag = 0;
-            long startWaiting = System.nanoTime();
-            while ((System.nanoTime() - startWaiting)/1000000 < responceWaitingLimit) {
-            GetResponse response = channel.basicGet(tempQueue, false);
-            if (response != null) {
-            result = new String(response.getBody());
-            deliveryTag = response.getEnvelope().getDeliveryTag();
-            break;
-            }
-            try {
-            Thread.sleep(1);
-            } catch (Exception e) {
-            e.printStackTrace();
-            }
-            }*/
-            /*	    if (log.isTraceEnabled()) {
-            double duration = (System.nanoTime() - startWaiting) / 1000000;
-            System.out.println(String.format("AMQP_MANAGER [%s] : Прием ответа выполнен за %5.2f msec.",System.nanoTime() - start, uid, duration));
-            }*/
-
-            /*	    long startWaiting = System.nanoTime();
-            while ((System.nanoTime() - startWaiting)/1000000 < responceWaitingLimit) {
-            delivery = consumer.nextDelivery(5);
-            if (delivery != null) {
-            result = new String(delivery.getBody());
-            break;
-            }
-            try {
-            Thread.sleep(1);
-            } catch (Exception e) {
-            e.printStackTrace();
-            }
-            }*/
-
-            long startWaiting = System.nanoTime();
-            boolean isStatusOk = false;
-            while (!isStatusOk) {
-                if ((System.nanoTime() - startWaiting) / 1000000 >= responceWaitingLimit) {
-                    break;
-                }
-
-                try {
-                    delivery = consumer.nextDelivery(responceWaitingLimit);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                if (delivery != null) {
-                    String r = new String(delivery.getBody());
-                    System.out.println(String.format("%s SEND_REQUEST [%s] : Получено сообщение : %s", ((System.nanoTime() - start) / 1000), uid, r));
-                    String status = tripleUtils.getStatusFromReply(r);
-                    if (status != null && status.equals(Predicates.STATE_OK)) {
-                        isStatusOk = true;
-                    }
-                    result.addAll(tripleUtils.getDataFromReply(r));
-                    try {
-                        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-                    } catch (IOException e) {
-                        System.out.println(String.format("%s SEND_REQUEST [%s] : Ошибка уведомления о получении.", ((System.nanoTime() - start) / 1000), uid));
-                        e.printStackTrace();
-                    }
-                }
-            }
-
-            if (result.size() > 0) {
-                System.out.println(String.format("%s SEND_REQUEST [%s] : Получен результат : %s", ((System.nanoTime() - start) / 1000), uid, result.toString()));
-            } else {
-                if (isStatusOk) {
-                    System.out.println(String.format("%s SEND_REQUEST [%s] : Получен пустой результат.", ((System.nanoTime() - start) / 1000), uid));
-                } else {
-                    System.out.println(String.format("%s SEND_REQUEST [%s] : Результат не получен в течение заданного времени ожидания.", ((System.nanoTime() - start) / 1000), uid));
-                }
-            }
-
-        } catch (IOException e) {
-            System.out.println(String.format("%s SEND_REQUEST [%s] : Ошибка отправки запроса.", ((System.nanoTime() - start) / 1000), uid));
-            e.printStackTrace();
-        } finally {
-            try {
-                channel.queueDelete(tempQueue);
-            } catch (Exception e) {
-            }
-            try {
-                channel.close();
-            } catch (Exception e) {
-            }
-        }
-
-        long finish = System.nanoTime();
-        double duration = (finish - start) / 1000000;
-        String traceMessage = String.format("%s SEND_REQUEST [%s] : FINISH : Запрос выполнен за %5.2f msec.", ((System.nanoTime() - start) / 1000), uid, duration);
-        System.out.println(traceMessage);
-        return result;
-    }
 
     /**
      * {@inheritDoc}
      */
-    synchronized public String getMessage(String queueToListen, int waitingTime) {
+    synchronized public String getMessage(String queueToListen, int waitingTime)
+    {
 
         long start = System.nanoTime();
 
@@ -233,38 +107,49 @@ public class AMQPMessagingManager implements IMessagingManager {
 
         String uid = java.util.UUID.randomUUID().toString();
         Channel channel;
-        try {
-            if (channel_get_message == null) {
+        try
+        {
+            if (channel_get_message == null)
+            {
                 channel = getConnection().createChannel();
                 channel_get_message = channel;
 
-                try {
+                try
+                {
                     channel.queueDeclare(queueToListen);
-                } catch (IOException e) {
+                } catch (IOException e)
+                {
                     throw new RuntimeException(String.format("GET_MESSAGE [%s] Ошибка создания очереди для приема сообщения.", uid), e);
                 }
-        consumer = new QueueingConsumer(channel);
-            channel.basicConsume(queueToListen, consumer);
+                consumer = new QueueingConsumer(channel);
+                channel.basicConsume(queueToListen, consumer);
 
-            } else {
+            } else
+            {
                 channel = channel_get_message;
             }
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             throw new RuntimeException(String.format("GET_MESSAGE [%s] Ошибка создания канала AMQP.", uid), e);
         }
 
-        try {
+        try
+        {
             Delivery delivery;
-            if (waitingTime > 0) {
+            if (waitingTime > 0)
+            {
                 delivery = consumer.nextDelivery(waitingTime);
-            } else {
+            } else
+            {
                 delivery = consumer.nextDelivery();
             }
-            if (delivery != null) {
- //               channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+            if (delivery != null)
+            {
+                //               channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 result = new String(delivery.getBody());
             }
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             throw new RuntimeException(String.format("GET_MESSAGE [%s] Ошибка приема AMQP пакета.", uid), e);
         }
 
@@ -275,12 +160,12 @@ public class AMQPMessagingManager implements IMessagingManager {
 //	}
 /*
         try {
-            channel.close();
+        channel.close();
         } catch (IOException e) {
-            System.out.println(String.format("GET_MESSAGE [%s] Ошибка закрытия AMQP канала.", uid));
-            e.printStackTrace();
+        System.out.println(String.format("GET_MESSAGE [%s] Ошибка закрытия AMQP канала.", uid));
+        e.printStackTrace();
         }
-*/
+         */
         /*	if (result != null) {
         long finish = System.nanoTime();
         double duration = (finish - start) / 1000000;
@@ -295,8 +180,10 @@ public class AMQPMessagingManager implements IMessagingManager {
      * 
      * @return
      */
-    private Connection getConnection() throws RuntimeException {
-        if (connection == null || !connection.isOpen()) {
+    private Connection getConnection() throws RuntimeException
+    {
+        if (connection == null || !connection.isOpen())
+        {
 
             System.out.println(String.format(
                     "Попытка соединения с сервером AMQP : host = %s, port = %s, "
@@ -310,9 +197,11 @@ public class AMQPMessagingManager implements IMessagingManager {
             params.setRequestedHeartbeat(0);
 
             ConnectionFactory factory = new ConnectionFactory(params);
-            try {
+            try
+            {
                 connection = factory.newConnection(host, port);
-            } catch (IOException e) {
+            } catch (IOException e)
+            {
                 System.out.println("Ошибка установки AMQP соединения.");
                 throw new RuntimeException("Ошибка установки AMQP соединения.", e);
             }

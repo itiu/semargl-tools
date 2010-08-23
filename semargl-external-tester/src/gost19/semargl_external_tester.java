@@ -91,51 +91,112 @@ public class semargl_external_tester
             DataInputStream in = new DataInputStream(fstream);
             BufferedReader br = new BufferedReader(new InputStreamReader(in));
             String strLine;
+
             //Read File Line By Line
             boolean flag_input_message_start = false;
-            StringBuffer message = null;
+            boolean flag_output_message_start = false;
+
+            boolean flag_input_message_ok = false;
+            boolean flag_output_message_ok = false;
+
+            StringBuffer input_message_et = null;
+            StringBuffer output_message_et = null;
+
+            String reply_to = null;
 
             while ((strLine = br.readLine()) != null)
             {
-                if (strLine.indexOf(" OUTPUT") > 0 && flag_input_message_start == true)
+                if (flag_output_message_start == true)
+                {
+                    output_message_et.append(strLine);
+                }
+
+                if (flag_output_message_start == true && strLine.indexOf("<" + Predicates.RESULT_STATE + ">\"" + Predicates.STATE_OK + "\".") > 0)
+                {
+                    flag_output_message_start = false;
+                    flag_output_message_ok = true;
+                }
+
+
+                if (flag_input_message_start == true && strLine.indexOf(" OUTPUT") > 0)
                 {
                     flag_input_message_start = false;
+                    flag_input_message_ok = true;
+                }
 
-                    String str_message = message.toString();
+                if (flag_input_message_start == true)
+                {
+                    input_message_et.append(strLine);
+                }
+
+                if (flag_input_message_ok == true && flag_output_message_ok == true)
+                {
+                    flag_input_message_ok = false;
+                    flag_output_message_ok = false;
+
 //                    System.out.println("\r\r\r\r\r");
-//                    System.out.println(message);
+//                    System.out.println("INPUT:");
+//                    System.out.println(input_message_et);
+//                    System.out.println("OUTPUT:");
+//                    System.out.println(output_message_et);
 
-                    String templ = "mo/ts/msg#r_t>";
-                    int str_pos_beg = str_message.indexOf(templ);
+                    String str_input_message_et = input_message_et.toString();
+
+                    String templ = Predicates.REPLY_TO + ">";
+                    int str_pos_beg = str_input_message_et.indexOf(templ);
                     if (str_pos_beg <= 0)
-                        throw new Exception ("reply_to not found");
+                    {
+                        throw new Exception("reply_to not found");
+                    }
 
                     str_pos_beg += templ.length();
-                    str_pos_beg = str_message.indexOf("\"", str_pos_beg);
-                    int str_pos_end = str_message.indexOf("\"", str_pos_beg+1);
+                    str_pos_beg = str_input_message_et.indexOf("\"", str_pos_beg);
+                    int str_pos_end = str_input_message_et.indexOf("\"", str_pos_beg + 1);
 
-                    String reply_to = str_message.substring(str_pos_beg + 1, str_pos_end);
-                    System.out.println ("reply_to = " + reply_to);
+                    reply_to = str_input_message_et.substring(str_pos_beg + 1, str_pos_end);
+//                    System.out.println("reply_to = " + reply_to);
                     if (reply_to.length() < 3)
-                        throw new Exception ("reply_to is invalid");
+                    {
+                        throw new Exception("reply_to is invalid");
+                    }
 
-                    str_message = str_message.replaceAll(templ + "\"" + reply_to, templ + "\"me");
-                    reply_to = "me";
+                    templ = Predicates.CREATE;
+                    if (str_input_message_et.indexOf(Predicates.CREATE) > 0)
+                    {
+                        String newId = null;
+                        str_pos_beg = output_message_et.indexOf(Predicates.RESULT_DATA);
+                        str_pos_beg += Predicates.RESULT_DATA.length() + 1;
+
+                        str_pos_end = output_message_et.indexOf(".", str_pos_beg);
+
+                        newId = output_message_et.substring(str_pos_beg + 1, str_pos_end - 1);
+
+                        str_input_message_et = str_input_message_et.replaceAll("<>", "<" + newId + ">");
+                        System.out.println("create: [" + newId + "]");
+                        System.out.println("str_input_message_et = " + str_input_message_et);
+
+                    }
+
+
+//                    str_input_message_et = str_input_message_et.replaceAll(templ + "\"" + reply_to, templ + "\"me");
+//                    reply_to = "me";
+
 
                     count++;
-                    mm.sendMessage(queue, str_message);
+//                    mm.sendMessage(queue, str_input_message_et);
 
 
                     String out_message = null;
-                    
-                    while (out_message == null)
-                        out_message = mm.getMessage(reply_to, 0);
+
+//                   while (out_message == null)
+//                    {
+//                        out_message = mm.getMessage(reply_to, 0);
+//                    }
 
 
+//                    System.out.println("out_message = " + out_message);
 
-                    System.out.println ("out_message = " + out_message);
-
-                    count_bytes += str_message.length();
+                    count_bytes += input_message_et.length();
 
                     if (count % delta == 0)
                     {
@@ -154,15 +215,19 @@ public class semargl_external_tester
 //                    Thread.currentThread().sleep(1000);
                 }
 
-                if (flag_input_message_start == true)
+
+                if (flag_output_message_start == false && strLine.indexOf(" OUTPUT") > 0)
                 {
-                    message = message.append(strLine);
+                    flag_output_message_start = true;
+                    flag_output_message_ok = false;
+                    output_message_et = new StringBuffer();
                 }
 
-                if (strLine.indexOf(" INPUT") > 0 && flag_input_message_start == false)
+                if (flag_input_message_start == false && strLine.indexOf(" INPUT") > 0)
                 {
                     flag_input_message_start = true;
-                    message = new StringBuffer();
+                    flag_input_message_ok = false;
+                    input_message_et = new StringBuffer();
                 }
 
             }
