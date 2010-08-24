@@ -1,10 +1,6 @@
 package gost19.amqp.messaging;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -48,8 +44,7 @@ public class AMQPMessagingManager
         getConnection();
 
         channel = getConnection().createChannel();
-        channel.queueDeclare("semargl-a", true);
-
+        channel.queueDeclare("semargl-test", true);
     }
 
     /**
@@ -57,12 +52,16 @@ public class AMQPMessagingManager
      * 
      * @throws IOException
      */
-    synchronized public void sendMessage(String to, String message)
+    synchronized public void sendMessage(String to, String message, String callback_queue)
     {
         try
         {
             //	    long start = System.nanoTime();
 
+//            channel = getConnection().createChannel();
+//	    channel.close();
+//            channel = getConnection().createChannel();
+//            channel.queueDeclare(callback_queue);
 //	    channel.queueDeclare(to);
 
 //            String uid = java.util.UUID.randomUUID().toString();
@@ -104,9 +103,10 @@ public class AMQPMessagingManager
         //						.format(
         //								"Проверка очереди [%s] на предмет нового сообщения. Время ожидания = %d мсек.",
         //								queueToListen, waitingTime));
+        channel_get_message = null;
 
         String uid = java.util.UUID.randomUUID().toString();
-        Channel channel;
+        Channel channel = null;
         try
         {
             if (channel_get_message == null)
@@ -145,9 +145,12 @@ public class AMQPMessagingManager
             }
             if (delivery != null)
             {
-                //               channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                               channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 result = new String(delivery.getBody());
             }
+
+        channel.close();
+        
         } catch (Exception e)
         {
             throw new RuntimeException(String.format("GET_MESSAGE [%s] Ошибка приема AMQP пакета.", uid), e);

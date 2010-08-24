@@ -134,12 +134,6 @@ public class semargl_external_tester
                     flag_input_message_ok = false;
                     flag_output_message_ok = false;
 
-//                    System.out.println("\r\r\r\r\r");
-//                    System.out.println("INPUT:");
-//                    System.out.println(input_message_et);
-//                    System.out.println("OUTPUT:");
-//                    System.out.println(output_message_et);
-
                     String str_input_message_et = input_message_et.toString();
 
                     String templ = Predicates.REPLY_TO + ">";
@@ -154,11 +148,18 @@ public class semargl_external_tester
                     int str_pos_end = str_input_message_et.indexOf("\"", str_pos_beg + 1);
 
                     reply_to = str_input_message_et.substring(str_pos_beg + 1, str_pos_end);
-//                    System.out.println("reply_to = " + reply_to);
                     if (reply_to.length() < 3)
                     {
                         throw new Exception("reply_to is invalid");
                     }
+
+
+//                    String new_reply_to = "me_" + java.util.UUID.randomUUID().toString();
+                    String new_reply_to = "";
+
+                    str_input_message_et = str_input_message_et.replaceAll(templ + "\"" + reply_to, templ + "\"" + new_reply_to);
+                    reply_to = new_reply_to;
+
 
                     templ = Predicates.CREATE;
                     if (str_input_message_et.indexOf(Predicates.CREATE) > 0)
@@ -172,31 +173,35 @@ public class semargl_external_tester
                         newId = output_message_et.substring(str_pos_beg + 1, str_pos_end - 1);
 
                         str_input_message_et = str_input_message_et.replaceAll("<>", "<" + newId + ">");
-                        System.out.println("create: [" + newId + "]");
-                        System.out.println("str_input_message_et = " + str_input_message_et);
+//                        System.out.println("create: [" + newId + "]");
+//                        System.out.println("str_input_message_et = " + str_input_message_et);
 
                     }
 
 
-//                    str_input_message_et = str_input_message_et.replaceAll(templ + "\"" + reply_to, templ + "\"me");
-//                    reply_to = "me";
+                    System.out.println("\r\r\r\r\r");
+                    System.out.println("INPUT:");
+                    System.out.println(str_input_message_et);
+//                    System.out.println("OUTPUT:");
+//                    System.out.println(output_message_et);
 
+                    System.out.println("reply_to = " + reply_to);
 
                     count++;
-//                    mm.sendMessage(queue, str_input_message_et);
 
+                    mm.sendMessage(queue, str_input_message_et, reply_to);
 
-                    String out_message = null;
+                    if (new_reply_to.length() > 0)
+                    {
+                        String out_message = null;
+                        while (out_message == null)
+                        {
+                            out_message = mm.getMessage(reply_to, 0);
+                            System.out.println(count + " OUTPUT: \r\n" + out_message);
+                        }
 
-//                   while (out_message == null)
-//                    {
-//                        out_message = mm.getMessage(reply_to, 0);
-//                    }
-
-
-//                    System.out.println("out_message = " + out_message);
-
-                    count_bytes += input_message_et.length();
+                        count_bytes += input_message_et.length();
+                    }
 
                     if (count % delta == 0)
                     {
@@ -212,7 +217,6 @@ public class semargl_external_tester
                         count_bytes = 0;
                     }
 
-//                    Thread.currentThread().sleep(1000);
                 }
 
 
