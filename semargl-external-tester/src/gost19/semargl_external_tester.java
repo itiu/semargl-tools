@@ -1,10 +1,15 @@
 package gost19;
 
 import gost19.amqp.messaging.AMQPMessagingManager;
+import gost19.amqp.messaging.MessageParser;
+import gost19.amqp.messaging.TripleUtils;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  *
@@ -16,6 +21,7 @@ public class semargl_external_tester
     public String autotest_file = "io_messages.log";
     public long count_repeat = 1;
     public boolean nocompare = false;
+    public boolean is_reply_to_null = false;
     public String queue = "semargl-test";
     public AMQPMessagingManager mm;
     public long count = 0;
@@ -23,17 +29,22 @@ public class semargl_external_tester
     public long stop_time;
     public long count_bytes;
     public int delta = 1000;
+    private TripleUtils tripleUtils = new TripleUtils();
+    private MessageParser messageParser = new MessageParser();
+    String host = "192.168.0.101"; //"itiu-desktop";
+    Integer port = 5672;
+    String virtualHost = "bigarchive";
+    String userName = "ba";
+    String password = "123456";
+    long responceWaitingLimit = 10000;
 
     semargl_external_tester() throws Exception
     {
-        mm = new AMQPMessagingManager();
+    }
 
-        String host = "172.17.1.81";
-        Integer port = 5672;
-        String virtualHost = "bigarchive";
-        String userName = "ba";
-        String password = "123456";
-        long responceWaitingLimit = 100;
+    public void init() throws Exception
+    {
+        mm = new AMQPMessagingManager();
 
         mm.init(host, port, virtualHost, userName, password, responceWaitingLimit);
     }
@@ -43,6 +54,7 @@ public class semargl_external_tester
      */
     public static void main(String[] args) throws Exception
     {
+        System.out.println("Semargl external tester v 0.0.1");
 
         semargl_external_tester autotest = new semargl_external_tester();
 
@@ -61,13 +73,26 @@ public class semargl_external_tester
                     autotest.count_repeat = Long.parseLong(args[i + 1]);
                     System.out.println("repeat = " + autotest.count_repeat);
                 }
+                if (args[i].equals("-rt0"))
+                {
+                    autotest.is_reply_to_null = true;
+                    System.out.println("mode: reply_to is null");
+                }
                 if (args[i].equals("-nocompare") || args[i].equals("-n"))
                 {
                     autotest.nocompare = true;
-                    System.out.println("no compare");
+                    System.out.println("mode: no compare");
+                }
+                if (args[i].equals("-message_service"))
+                {
+                    autotest.host = args[i + 1];
+                    System.out.println("message_service : " + autotest.host);
                 }
             }
         }
+
+        autotest.init();
+
 
         autotest.start_time = System.currentTimeMillis();
         autotest.count_bytes = 0;
@@ -93,114 +118,189 @@ public class semargl_external_tester
             String strLine;
 
             //Read File Line By Line
-            boolean flag_input_message_start = false;
-            boolean flag_output_message_start = false;
 
-            boolean flag_input_message_ok = false;
-            boolean flag_output_message_ok = false;
-
-            StringBuffer input_message_et = null;
-            StringBuffer output_message_et = null;
-
-            String reply_to = null;
+            String input_message_et = null;
+            List<String> output_message_et = null;
 
             while ((strLine = br.readLine()) != null)
             {
-                if (flag_output_message_start == true)
+                if (strLine.indexOf(" INPUT") > 0)
                 {
-                    output_message_et.append(strLine);
+                    input_message_et = br.readLine();
+                    output_message_et = new ArrayList<String>();
                 }
 
-                if (flag_output_message_start == true && strLine.indexOf("<" + Predicates.RESULT_STATE + ">\"" + Predicates.STATE_OK + "\".") > 0)
+                if (strLine.indexOf(" OUTPUT") > 0)
                 {
-                    flag_output_message_start = false;
-                    flag_output_message_ok = true;
-                }
+                    String msg = br.readLine();
+                    output_message_et.add(msg);
 
-
-                if (flag_input_message_start == true && strLine.indexOf(" OUTPUT") > 0)
-                {
-                    flag_input_message_start = false;
-                    flag_input_message_ok = true;
-                }
-
-                if (flag_input_message_start == true)
-                {
-                    input_message_et.append(strLine);
-                }
-
-                if (flag_input_message_ok == true && flag_output_message_ok == true)
-                {
-                    flag_input_message_ok = false;
-                    flag_output_message_ok = false;
-
-                    String str_input_message_et = input_message_et.toString();
-
-                    String templ = Predicates.REPLY_TO + ">";
-                    int str_pos_beg = str_input_message_et.indexOf(templ);
-                    if (str_pos_beg <= 0)
+                    if (msg.indexOf(Predicates.STATE_OK) > 0)
                     {
-                        throw new Exception("reply_to not found");
+                        go(input_message_et, output_message_et);
                     }
+                }
 
-                    str_pos_beg += templ.length();
-                    str_pos_beg = str_input_message_et.indexOf("\"", str_pos_beg);
-                    int str_pos_end = str_input_message_et.indexOf("\"", str_pos_beg + 1);
+            }
+            //Close the input stream
+            in.close();
+        } catch (Exception e)
+        {//Catch exception if any
+            e.printStackTrace();
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
 
-                    reply_to = str_input_message_et.substring(str_pos_beg + 1, str_pos_end);
-                    if (reply_to.length() < 3)
-                    {
-                        throw new Exception("reply_to is invalid");
-                    }
+    void go(String input_message_et, List<String> output_message_et) throws Exception
+    {
+        String reply_to;
+        String templ = Predicates.REPLY_TO + ">";
+        int str_pos_beg = input_message_et.indexOf(templ);
+        if (str_pos_beg <= 0)
+        {
+            throw new Exception("reply_to not found");
+        }
+
+        str_pos_beg += templ.length();
+        str_pos_beg = input_message_et.indexOf("\"", str_pos_beg);
+        int str_pos_end = input_message_et.indexOf("\"", str_pos_beg + 1);
+
+        reply_to = input_message_et.substring(str_pos_beg + 1, str_pos_end);
+
+        String new_reply_to = "";
+
+        if (is_reply_to_null == false)
+        {
+            new_reply_to = "me_" + java.util.UUID.randomUUID().toString();
+//                        new_reply_to = mm.allocateQueue();
+        }
 
 
-//                    String new_reply_to = "me_" + java.util.UUID.randomUUID().toString();
-                    String new_reply_to = "";
+        input_message_et = input_message_et.replaceAll(templ + "\"" + reply_to, templ + "\"" + new_reply_to);
+        reply_to = new_reply_to;
 
-                    str_input_message_et = str_input_message_et.replaceAll(templ + "\"" + reply_to, templ + "\"" + new_reply_to);
-                    reply_to = new_reply_to;
+        templ = Predicates.CREATE;
+        if (input_message_et.indexOf(Predicates.CREATE) > 0)
+        {
+            String newId = null;
+            str_pos_beg = output_message_et.indexOf(Predicates.RESULT_DATA);
+            str_pos_beg += Predicates.RESULT_DATA.length() + 1;
 
+            str_pos_end = output_message_et.get(0).indexOf(".", str_pos_beg);
 
-                    templ = Predicates.CREATE;
-                    if (str_input_message_et.indexOf(Predicates.CREATE) > 0)
-                    {
-                        String newId = null;
-                        str_pos_beg = output_message_et.indexOf(Predicates.RESULT_DATA);
-                        str_pos_beg += Predicates.RESULT_DATA.length() + 1;
+            newId = output_message_et.get(0).substring(str_pos_beg + 1, str_pos_end - 1);
 
-                        str_pos_end = output_message_et.indexOf(".", str_pos_beg);
-
-                        newId = output_message_et.substring(str_pos_beg + 1, str_pos_end - 1);
-
-                        str_input_message_et = str_input_message_et.replaceAll("<>", "<" + newId + ">");
+            input_message_et = input_message_et.replaceAll("<>", "<" + newId + ">");
 //                        System.out.println("create: [" + newId + "]");
 //                        System.out.println("str_input_message_et = " + str_input_message_et);
 
-                    }
+        }
+
+//                et_result.addAll(tripleUtils.getDataFromReply(output_message_et.toString()));
+        List<String> get_result = null;
+        List<String> eth_result = new ArrayList<String>();
 
 
-                    System.out.println("\r\r\r\r\r");
-                    System.out.println("INPUT:");
-                    System.out.println(str_input_message_et);
+        for (String element : output_message_et)
+        {
+            eth_result.addAll(tripleUtils.getDataFromReply(element));
+        }
+//                    System.out.println("\r\r\r\r\r");
+//                    System.out.println("INPUT:");
+//                    System.out.println(str_input_message_et);
 //                    System.out.println("OUTPUT:");
 //                    System.out.println(output_message_et);
 
-                    System.out.println("reply_to = " + reply_to);
+//                    System.out.println("reply_to = " + reply_to);
 
-                    count++;
+        count++;
 
-                    mm.sendMessage(queue, str_input_message_et, reply_to);
+        try
+        {
 
-                    if (new_reply_to.length() > 0)
+            if (nocompare == true)
+            {
+                mm.sendMessage(queue, input_message_et, reply_to);
+            } else
+            {
+                List<String> etTriples = messageParser.split(input_message_et);
+                String op_uid = tripleUtils.getTripleFromLine(etTriples.get(0)).getSubj();
+                get_result = mm.sendRequest(op_uid, queue, input_message_et, false, reply_to);
+                count_bytes += input_message_et.length();
+
+
+                if (eth_result != null && get_result != null)
+                {
+                    if (eth_result.size() != get_result.size())
                     {
-                        String out_message = null;
-                        while (out_message == null)
+                        System.out.println("et_result.size() != result.size()");
+                        return;
+                    }
+
+                    List<String> eth_elements = new ArrayList<String>();
+                    List<String> get_elements = new ArrayList<String>();
+
+                    // соберем ответные пакеты в общий массив
+                    for (int i = 0; i < eth_result.size(); i++)
+                    {
+                        String[] arrayOf_S_Et;
+                        String[] arrayOf_S_Get;
+
+                        String S_Et = eth_result.get(i);
+                        String S_Get = get_result.get(i);
+
+                        if (S_Et.indexOf(".") > 0)
                         {
-                            out_message = mm.getMessage(reply_to, 0);
-                            System.out.println(count + " OUTPUT: \r\n" + out_message);
+                            arrayOf_S_Et = S_Et.split("\"[.]");
+                            arrayOf_S_Get = S_Get.split("\"[.]");
+
+                        } else
+                        {
+                            arrayOf_S_Et = S_Et.split(",");
+                            arrayOf_S_Get = S_Get.split(",");
                         }
 
-                        count_bytes += input_message_et.length();
+                        eth_elements.addAll(Arrays.asList(arrayOf_S_Et));
+                        get_elements.addAll(Arrays.asList(arrayOf_S_Get));
+                    }
+
+                    if (eth_elements.size() != get_elements.size())
+                    {
+                        throw new Exception("count elements not equals: ethalon.length=" + eth_elements.size() + ", result.length=" + get_elements.size());
+                    }
+
+
+                    for (int ii = 0; ii < eth_elements.size(); ii++)
+                    {
+                        boolean ii_found = false;
+                        String ethalon = eth_elements.get(ii);
+
+                        for (int jj = 0; jj < get_elements.size(); jj++)
+                        {
+                            if (ethalon.equals(get_elements.get(jj)))
+                            {
+                                //                                                        System.out.println("[" + arrayOf_S_Et[ii] + "], ii=" + ii + ", jj=" + jj);
+                                ii_found = true;
+                                break;
+                            }
+                        }
+
+                        if (ii_found == false)
+                        {
+                            throw new Exception("ethalon element [" + ethalon + "] not found in result");
+                        }
+                    }
+
+
+
+
+
+
+
+                    if (count % 1000 == 0)
+                    {
+                        System.out.println("sleep 10s");
+                        Thread.currentThread().sleep(10000);
                     }
 
                     if (count % delta == 0)
@@ -211,35 +311,29 @@ public class semargl_external_tester
 
                         System.out.println("send " + count + " messages, time = " + time_in_sec + ", cps = " + delta / time_in_sec + ", count kBytes = " + count_bytes / 1024);
 
-//                        Thread.currentThread().sleep(100);
+                        //                        Thread.currentThread().sleep(100);
 
                         start_time = System.currentTimeMillis();
                         count_bytes = 0;
                     }
 
+
                 }
-
-
-                if (flag_output_message_start == false && strLine.indexOf(" OUTPUT") > 0)
-                {
-                    flag_output_message_start = true;
-                    flag_output_message_ok = false;
-                    output_message_et = new StringBuffer();
-                }
-
-                if (flag_input_message_start == false && strLine.indexOf(" INPUT") > 0)
-                {
-                    flag_input_message_start = true;
-                    flag_input_message_ok = false;
-                    input_message_et = new StringBuffer();
-                }
-
             }
-            //Close the input stream
-            in.close();
-        } catch (Exception e)
-        {//Catch exception if any
-            System.err.println("Error: " + e.getMessage());
+
+        } catch (Exception ex)
+        {
+            System.out.println("\r\r\r\r\r");
+            System.out.println("INPUT:");
+            System.out.println(input_message_et);
+            System.out.println("OUTPUT:");
+            System.out.println(output_message_et);
+
+            throw ex;
         }
+
+
+
+
     }
 }

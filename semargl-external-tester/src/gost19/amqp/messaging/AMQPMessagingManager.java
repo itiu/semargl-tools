@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.ConnectionParameters;
 import com.rabbitmq.client.QueueingConsumer;
 import com.rabbitmq.client.QueueingConsumer.Delivery;
 import com.rabbitmq.client.MessageProperties;
@@ -18,6 +17,39 @@ import gost19.Predicates;
 public class AMQPMessagingManager
 {
 
+    class Log
+    {
+
+        void trace(String msg)
+        {
+            System.out.println(msg);
+        }
+
+        void info(String msg)
+        {
+            System.out.println(msg);
+        }
+
+        void debug(String msg)
+        {
+            System.out.println(msg);
+        }
+
+        void error(String msg, Exception err)
+        {
+            System.out.println(msg + ", Exception:" + err.getMessage());
+        }
+
+        void error(String msg)
+        {
+            System.out.println(msg);
+        }
+
+        void warning(String msg)
+        {
+            System.out.println(msg);
+        }
+    }
     private Connection sendConnection;
     private String host;
     private int port;
@@ -25,10 +57,11 @@ public class AMQPMessagingManager
     private String login;
     private String password;
     private long responceWaitingLimit = 0;
+    private Log log;
     private TripleUtils tripleUtils = new TripleUtils();
     private MessageParser messageParser = new MessageParser();
     private Channel channel = null;
-    private final String requestQueueName = "request-queue-" + java.util.UUID.randomUUID().toString();
+    private String requestQueueName = "request-queue-" + java.util.UUID.randomUUID().toString();
     private QueueingConsumer requestConsumer = null;
     private Object lock = new Object();
     private boolean isPersistenceMode = true;
@@ -46,6 +79,7 @@ public class AMQPMessagingManager
         this.login = userName;
         this.password = password;
         this.responceWaitingLimit = responceWaitingLimit;
+        this.log = new Log();
     }
 
     /**
@@ -53,14 +87,19 @@ public class AMQPMessagingManager
      *
      * @throws IOException
      */
-    public void sendMessage(String to, String message)
+    public void sendMessage(String to, String message, String queueToListen)
     {
         try
         {
-            String uid = java.util.UUID.randomUUID().toString();
-//			log.debug(String.format("[%s] Отправка в очередь '%s' сообщения \n %s", requestQueueName, to, message));
+//            String uid = java.util.UUID.randomUUID().toString();
+            log.debug(String.format("[%s] Отправка в очередь '%s' сообщения \n %s", requestQueueName, to, message));
 
-            getChannel().queueDeclare(to, isPersistenceMode);
+//            getChannel().queueDeclare(to, isPersistenceMode);
+            if (queueToListen.length() > 0)
+            {
+                getChannel().queueDeclare(queueToListen, false, false, false, null);
+            }
+
             if (isPersistenceMode)
             {
                 getChannel().basicPublish("", to, MessageProperties.PERSISTENT_TEXT_PLAIN, message.getBytes());
@@ -71,7 +110,7 @@ public class AMQPMessagingManager
 
         } catch (IOException e)
         {
-//			log.error(String.format("[%s] Ошибка отправки сообщенния ", requestQueueName), e);
+            log.error(String.format("[%s] Ошибка отправки сообщенния ", requestQueueName), e);
         }
     }
 
@@ -79,21 +118,22 @@ public class AMQPMessagingManager
      * {@inheritDoc}
      */
     public List<String> sendRequest(String uid, String to, String message,
-            boolean withWaitingLimit) throws RuntimeException
+            boolean withWaitingLimit, String queueToListen) throws RuntimeException
     {
+        requestQueueName = queueToListen;
         long start = System.nanoTime();
-//		log.debug(String.format("[%s] SEND_REQUEST [%s] : START : Подготовлен пакет для получателя '%s', isPersistenceMode = %s. Содержимое \n[\n%s\n]\n",
-//					requestQueueName, uid, to, isPersistenceMode, message));
+        log.debug(String.format("[%s] SEND_REQUEST [%s] : START : Подготовлен пакет для получателя '%s', isPersistenceMode = %s. Содержимое \n[\n%s\n]\n",
+                requestQueueName, uid, to, isPersistenceMode, message));
 
         List<String> result = new ArrayList();
 
         try
         {
-            getChannel().queueDeclare(requestQueueName, false, isPersistenceMode, false, true, null);
+            getChannel().queueDeclare(requestQueueName, isPersistenceMode, false, true, null);
 
-            String setFromUid = java.util.UUID.randomUUID().toString();
-            message = String.format("%s<%s><%s><%s>.<%s><%s>\"%s\".<%s><%s>\"%s\".", message, setFromUid, Predicates.SUBJECT, Predicates.SET_FROM,
-                    setFromUid, Predicates.FUNCTION_ARGUMENT, requestQueueName, uid, Predicates.REPLY_TO, requestQueueName);
+//            String setFromUid = java.util.UUID.randomUUID().toString();
+//            message = String.format("%s<%s><%s><%s>.<%s><%s>\"%s\".<%s><%s>\"%s\".", message, setFromUid, Predicates.SUBJECT, Predicates.SET_FROM,
+//                    setFromUid, Predicates.FUNCTION_ARGUMENT, requestQueueName, uid, Predicates.REPLY_TO, requestQueueName);
 
             // отправляем пакет
             if (isPersistenceMode)
@@ -104,11 +144,11 @@ public class AMQPMessagingManager
                 getChannel().basicPublish("", to, MessageProperties.TEXT_PLAIN, message.getBytes());
             }
 
-//			log.debug(String.format("[%s] SEND_REQUEST [%s] : Пакет отправлен. Время ожидания ответа %s",
-//						requestQueueName, uid, String.valueOf(responceWaitingLimit)));
+            log.debug(String.format("[%s] SEND_REQUEST [%s] : Пакет отправлен. Время ожидания ответа %s",
+                    requestQueueName, uid, String.valueOf(responceWaitingLimit)));
 
             Delivery delivery = null;
-            if (requestConsumer == null || requestConsumer.getChannel() == null || !requestConsumer.getChannel().isOpen())
+//            if (requestConsumer == null || requestConsumer.getChannel() == null || !requestConsumer.getChannel().isOpen())
             {
                 requestConsumer = new QueueingConsumer(getChannel());
                 getChannel().basicConsume(requestQueueName, !isPersistenceMode, requestConsumer);
@@ -119,16 +159,16 @@ public class AMQPMessagingManager
             boolean isStatusError = false;
             while (!(isStatusOk || isStatusError))
             {
-                if ((System.nanoTime() - startWaiting) / 10000000 >= responceWaitingLimit)
+                if ((System.nanoTime() - startWaiting) / 1000000 >= responceWaitingLimit)
                 {
                     break;
                 }
 
                 try
                 {
-//					log.debug(String.format("[%s] request consumer.nextDelivery start", uid));
+                    log.debug(String.format("[%s] request consumer.nextDelivery start", uid));
                     delivery = requestConsumer.nextDelivery(responceWaitingLimit);
-//					log.debug(String.format("[%s] request consumer.nextDelivery end", uid));
+                    log.debug(String.format("[%s] request consumer.nextDelivery end", uid));
                 } catch (InterruptedException e)
                 {
                     e.printStackTrace();
@@ -137,16 +177,16 @@ public class AMQPMessagingManager
                 if (delivery != null)
                 {
                     String r = new String(delivery.getBody());
-//                    log.debug(String.format("[%s] SEND_REQUEST [%s] : Получено сообщение : %s", requestQueueName, uid, r));
+                    log.debug(String.format("[%s] SEND_REQUEST [%s] : Получено сообщение : %s", requestQueueName, uid, r));
 
                     List<String> replyTriples = messageParser.split(r);
                     if (replyTriples.size() > 0)
                     {
                         String replyUid = tripleUtils.getTripleFromLine(replyTriples.get(0)).getSubj();
-//                        if (replyUid.equals(uid))
+                        if (replyUid.equals(uid))
                         {
                             String status = tripleUtils.getStatusFromReply(r);
-//                            log.debug(String.format("[%s] SEND_REQUEST [%s] : ...статус : %s", requestQueueName, uid, status));
+                            log.debug(String.format("[%s] SEND_REQUEST [%s] : ...статус : %s", requestQueueName, uid, status));
                             if (status != null)
                             {
                                 if (status.equals(Predicates.STATE_OK))
@@ -157,23 +197,26 @@ public class AMQPMessagingManager
                                     isStatusError = true;
                                 }
                             }
- //                           log.debug(String.format("[%s] SEND_REQUEST [%s] : ...isStatusOk : %s", requestQueueName, uid, isStatusOk));
+                            else
+                            {
+                                result.addAll(tripleUtils.getDataFromReply(r));
+                            }
+
+                            log.debug(String.format("[%s] SEND_REQUEST [%s] : ...isStatusOk : %s", requestQueueName, uid, isStatusOk));
                             if (isStatusOk)
                             {
                                 result.addAll(tripleUtils.getDataFromReply(r));
- //                               log.debug(String.format("[%s] SEND_REQUEST [%s] : ...result : %s", requestQueueName, uid, result));
+                                log.debug(String.format("[%s] SEND_REQUEST [%s] : ...result : %s", requestQueueName, uid, result));
                             }
 
-                        }
-//                        else
+                        } else
                         {
- //                           log.warning(String.format("[%s] SEND_REQUEST [%s] : ...INVALID ANSWER UID! WAITING NEXT!",
- //                                   requestQueueName, uid));
-//                            startWaiting += responceWaitingLimit;
+                            log.warning(String.format("[%s] SEND_REQUEST [%s] : ...INVALID ANSWER UID! WAITING NEXT!", requestQueueName, uid));
+                            startWaiting += responceWaitingLimit;
                         }
                     } else
                     {
-//                        log.warning(String.format("[%s] SEND_REQUEST [%s] : ...ANSWER PARSING ERROR! WAITING NEXT!", requestQueueName, uid));
+                        log.warning(String.format("[%s] SEND_REQUEST [%s] : ...ANSWER PARSING ERROR! WAITING NEXT!", requestQueueName, uid));
                         startWaiting += responceWaitingLimit;
                     }
                     if (isPersistenceMode)
@@ -183,38 +226,40 @@ public class AMQPMessagingManager
                             getChannel().basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                         } catch (IOException e)
                         {
- //                           log.error(String.format("[%s] SEND_REQUEST [%s] : Ошибка уведомления о получении.", requestQueueName, uid));
+                            log.error(String.format("[%s] SEND_REQUEST [%s] : Ошибка уведомления о получении.", requestQueueName, uid));
                             e.printStackTrace();
                         }
- //                       log.debug(String.format("[%s] SEND_REQUEST [%s] : ...уведомление отправлено", requestQueueName, uid));
+                        log.debug(String.format("[%s] SEND_REQUEST [%s] : ...уведомление отправлено", requestQueueName, uid));
                     }
                 }
             }
 
+            getChannel().queueDelete(requestQueueName);
+
             if (result.size() > 0)
             {
-  //              log.debug(String.format("[%s] SEND_REQUEST [%s] : Получен результат : %s", requestQueueName, uid, result.toString()));
+                log.debug(String.format("[%s] SEND_REQUEST [%s] : Получен результат : %s", requestQueueName, uid, result.toString()));
             } else
             {
                 if (isStatusOk)
                 {
-  //                  log.info(String.format("[%s] SEND_REQUEST [%s] : Получен пустой результат.", requestQueueName, uid));
+                    log.info(String.format("[%s] SEND_REQUEST [%s] : Получен пустой результат.", requestQueueName, uid));
                 } else
                 {
-  //                  log.error(String.format("[%s] SEND_REQUEST [%s] : Результат не получен в течение заданного времени ожидания.", requestQueueName, uid));
+                    log.error(String.format("[%s] SEND_REQUEST [%s] : Результат не получен в течение заданного времени ожидания.", requestQueueName, uid));
                 }
             }
 
         } catch (IOException e)
         {
-  //          log.error(String.format("[%s] SEND_REQUEST [%s] : Ошибка отправки запроса.", requestQueueName, uid));
-  //          log.error(String.format("[%s] %s", requestQueueName, e.getMessage()));
+            log.error(String.format("[%s] SEND_REQUEST [%s] : Ошибка отправки запроса.", requestQueueName, uid));
+            log.error(String.format("[%s] %s", requestQueueName, e.getMessage()));
         }
 
         long finish = System.nanoTime();
         double duration = (finish - start) / 1000000;
         String traceMessage = String.format("[%s] SEND_REQUEST [%s] : FINISH : Запрос выполнен за %5.2f msec.", requestQueueName, uid, duration);
-  //      log.trace(String.format("[%s] %s", requestQueueName, traceMessage));
+        log.trace(String.format("[%s] %s", requestQueueName, traceMessage));
         return result;
 
     }
@@ -233,12 +278,13 @@ public class AMQPMessagingManager
 
         try
         {
-            getChannel().queueDeclare(queueToListen, isPersistenceMode);
+//            getChannel().queueDeclare(queueToListen, isPersistenceMode);
+            getChannel().queueDeclare(queueToListen, false, false, false, null);
         } catch (Exception e)
         {
-//            log.error(String.format("[%s] Проверка очереди [%s] на предмет нового сообщения. Время ожидания = %d мсек.",
- //                   requestQueueName, queueToListen, waitingTime));
-  //          log.error(String.format("GET_MESSAGE [%s] Ошибка создания очереди для приема сообщения.", uid), e);
+            log.error(String.format("[%s] Проверка очереди [%s] на предмет нового сообщения. Время ожидания = %d мсек.",
+                    requestQueueName, queueToListen, waitingTime));
+            log.error(String.format("GET_MESSAGE [%s] Ошибка создания очереди для приема сообщения.", uid), e);
             return null;
         }
 
@@ -252,7 +298,7 @@ public class AMQPMessagingManager
                 consumersMap.put(queueToListen, consumer);
             } catch (Exception e)
             {
-  //              log.error("Ошибка при маппинге потребителя для очереди " + queueToListen, e);
+                log.error("Ошибка при маппинге потребителя для очереди " + queueToListen, e);
             }
         }
         try
@@ -275,15 +321,15 @@ public class AMQPMessagingManager
             }
         } catch (Exception e)
         {
-   //         log.debug(String.format("[%s] Проверка очереди [%s] на предмет нового сообщения. Время ожидания = %d мсек.",
-    //                requestQueueName, queueToListen, waitingTime));
-  //          log.error(String.format("GET_MESSAGE [%s] Ошибка приема AMQP пакета.", uid), e);
+            log.debug(String.format("[%s] Проверка очереди [%s] на предмет нового сообщения. Время ожидания = %d мсек.",
+                    requestQueueName, queueToListen, waitingTime));
+            log.error(String.format("GET_MESSAGE [%s] Ошибка приема AMQP пакета.", uid), e);
             return null;
         }
 
         if (result != null)
         {
-    //        log.debug(String.format("[%s] GET_MESSAGE [%s] Получено сообщение : %s", requestQueueName, uid, result));
+            log.debug(String.format("[%s] GET_MESSAGE [%s] Получено сообщение : %s", requestQueueName, uid, result));
         }
 
         return result;
@@ -298,13 +344,13 @@ public class AMQPMessagingManager
                 channel = getConnection().createChannel();
             } catch (IOException e)
             {
- //               log.error(String.format("[%s] Ошибка открытия AMQP канала.\n%s", requestQueueName, e));
+                log.error(String.format("[%s] Ошибка открытия AMQP канала.\n%s", requestQueueName, e));
                 try
                 {
                     Thread.sleep(500);
                 } catch (InterruptedException ex)
                 {
- //                   log.error(String.format("[%s] %s", requestQueueName, ex.getMessage()));
+                    log.error(String.format("[%s] %s", requestQueueName, ex.getMessage()));
                 }
                 continue;
             }
@@ -326,25 +372,25 @@ public class AMQPMessagingManager
         }
         while (sendConnection == null)
         {
-  //          log.info(String.format("[%s] Попытка соединения с сервером AMQP : host = %s, port = %s, "
-  //                  + "virtualHost = %s, login = %s, password = %s",
- //                   requestQueueName, host, port, virtualHost, login, password));
+            System.out.print(String.format("[%s] Попытка соединения с сервером AMQP : host = %s, port = %s, "
+                    + "virtualHost = %s, login = %s, password = %s",
+                    requestQueueName, host, port, virtualHost, login, password));
 
-            ConnectionParameters params = new ConnectionParameters();
-            params.setUsername(login);
-            params.setPassword(password);
-            params.setVirtualHost(virtualHost);
-            params.setRequestedHeartbeat(0);
+            ConnectionFactory factory = new ConnectionFactory();
+            factory.setHost(host);
+            factory.setPort(port);
+            factory.setVirtualHost(virtualHost);
+            factory.setUsername(login);
+            factory.setPassword(password);
 
-            ConnectionFactory factory = new ConnectionFactory(params);
             try
             {
-                sendConnection = factory.newConnection(host, port);
-   //             log.debug(String.format("[%s] Соединение создано успешно.", requestQueueName));
+                sendConnection = factory.newConnection();
+                log.debug(String.format("[%s] Соединение создано успешно.", requestQueueName));
             } catch (IOException e)
             {
- //               log.error(String.format("[%s] Ошибка создания AMQP соединения.", requestQueueName));
- //               log.error(String.format("[%s] %s", requestQueueName, e.getMessage()));
+                log.error(String.format("[%s] Ошибка создания AMQP соединения.", requestQueueName));
+                log.error(String.format("[%s] %s", requestQueueName, e.getMessage()));
                 try
                 {
                     Thread.sleep(500);
@@ -374,7 +420,7 @@ public class AMQPMessagingManager
             }
         } catch (Exception e)
         {
- //           log.error("Ошибка закрытия AMQP-соединения", e);
+            log.error("Ошибка закрытия AMQP-соединения", e);
         }
     }
 }

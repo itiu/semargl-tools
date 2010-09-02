@@ -1,38 +1,29 @@
 package gost19;
 
-public class Predicates {
-
+public class Predicates
+{
     public static String NAMESPACE = "mo#";
     public static String AUTHORIZATION_FUNCTIONS_NAMESPACE = "mo/at/fn#";
     public static String AUTHORIZATION_ACL_NAMESPACE = "mo/at/acl#";
     public static String TRANSPORT_NAMESPACE = "mo/ts#";
     public static String TRANSPORT_MESSAGE_NAMESPACE = "mo/ts/msg#";
     public static String DOCUMENT_STORAGE_NAMESPACE = "mo/doc#";
-
     public static String FUNCTION_ARGUMENT = TRANSPORT_NAMESPACE + "arg";
-
     public static String RESULT_DATA = TRANSPORT_NAMESPACE + "r:d";
     public static String RESULT_STATE = TRANSPORT_NAMESPACE + "r:s";
-
     public static String REPLY_TO = TRANSPORT_MESSAGE_NAMESPACE + "r_t";
-
     public static String STATE_OK = "ok";
     public static String STATE_ERROR = "er";
     public static String STATE_WAITING = "wt";
-
     public static String SUBJECT = NAMESPACE + "sj";
-
     public static String SET_FROM = TRANSPORT_NAMESPACE + "sf";
-
     public static String DELETE_SUBJECTS = NAMESPACE + "ds";
-    public static String DELETE_SUBJECTS_BY_PREDICATE = NAMESPACE + "dsp";    
-    public static String PUT = NAMESPACE + "p";    
-    public static String GET = NAMESPACE + "g";    
-
+    public static String DELETE_SUBJECTS_BY_PREDICATE = NAMESPACE + "dsp";
+    public static String PUT = NAMESPACE + "p";
+    public static String GET = NAMESPACE + "g";
     // категории объектов
     public static String CATEGORY_DOCUMENT = "DOCUMENT";
     public static String CATEGORY_DOCUMENT_DRAFT = "DOCUMENTDRAFT";
-
     // функции авторизации
     public static String CREATE = AUTHORIZATION_FUNCTIONS_NAMESPACE + "cr";
     public static String UPDATE = AUTHORIZATION_FUNCTIONS_NAMESPACE + "up";
@@ -43,27 +34,22 @@ public class Predicates {
     public static String GET_DELEGATE_ASSIGNERS_TREE = AUTHORIZATION_FUNCTIONS_NAMESPACE + "gdat";
     public static String LIST_DELEGATES = AUTHORIZATION_FUNCTIONS_NAMESPACE + "getDelegatorsRecords";
     public static String AUTHORIZE = AUTHORIZATION_FUNCTIONS_NAMESPACE + "a";
-
     // делегаты
     public static String DELEGATION_DELEGATE = AUTHORIZATION_ACL_NAMESPACE + "de";
     public static String DELEGATION_OWNER = AUTHORIZATION_ACL_NAMESPACE + "ow";
     public static String DELEGATION_WITH_TREE = AUTHORIZATION_ACL_NAMESPACE + "wt";
     public static String DELEGATION_DOCUMENT_ID = AUTHORIZATION_ACL_NAMESPACE + "dg_doc_id";
-
     // функции модуля справочников
     public static String GET_DICTIONARY_ID_BY_ATTRIBUTE_ID = NAMESPACE + "gdibai";
     public static String GET_DICTIONARY_ID_BY_RECORD_ID = NAMESPACE + "gdibri";
     public static String GET_DICTIONARY_RECORD_NAME_BY_ATTRIBUTE_ID = NAMESPACE + "grnbai";
-
     // функции модуля аутентификации
     public static String GET_USER_BY_TICKET = NAMESPACE + "gubt";
     public static String IS_BANNED = NAMESPACE + "ib";
-
     // документ
     public static String DOCUMENT_TYPE_NAME = DOCUMENT_STORAGE_NAMESPACE + "tpnm";
     public static String DOCUMENT_TEMPLATE_ID = DOCUMENT_STORAGE_NAMESPACE + "tmplid";
-    public static String INHERIT = DOCUMENT_STORAGE_NAMESPACE+ "inherit_rights";
-
+    public static String INHERIT = DOCUMENT_STORAGE_NAMESPACE + "inherit_rights";
     // запись о праве
     public static String AUTHOR_SYSTEM = AUTHORIZATION_ACL_NAMESPACE + "atS";
     public static String AUTHOR_SUBSYSTEM = AUTHORIZATION_ACL_NAMESPACE + "atSs";
@@ -76,13 +62,11 @@ public class Predicates {
     public static String DATE_TO = AUTHORIZATION_ACL_NAMESPACE + "dtT";
     public static String ELEMENT_ID = AUTHORIZATION_ACL_NAMESPACE + "eId";
     public static String RIGHTS = AUTHORIZATION_ACL_NAMESPACE + "rt";
-
     public static String CREATOR = "pcr";
     public static String IDENTIFIER = "pid";
     public static String HAS_PART = NAMESPACE + "hsPt";
     public static String MEMBER_OF = NAMESPACE + "mmbOf";
     public static String LOGIN_NAME = "login";
-
 }
 
 /*public class Predicates {
