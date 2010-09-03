@@ -319,6 +319,8 @@ public class semargl_external_tester
 
 
                 }
+                else
+                    throw new Exception ("eth_result == null OR get_result == null");
             }
 
         } catch (Exception ex)
