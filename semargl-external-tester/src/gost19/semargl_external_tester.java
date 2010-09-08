@@ -1,8 +1,10 @@
 package gost19;
 
-import gost19.amqp.messaging.AMQPMessagingManager;
-import gost19.amqp.messaging.MessageParser;
-import gost19.amqp.messaging.TripleUtils;
+import gost19.messaging.MessageParser;
+import gost19.messaging.TripleUtils;
+import gost19.messaging.transport.AMQPMessagingManager;
+import gost19.messaging.transport.IMessagingManager;
+import gost19.messaging.transport.ZMQMessagingManager;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.FileInputStream;
@@ -23,7 +25,6 @@ public class semargl_external_tester
     public boolean nocompare = false;
     public boolean is_reply_to_null = false;
     public String queue = "semargl-test";
-    public AMQPMessagingManager mm;
     public long count = 0;
     public long start_time;
     public long stop_time;
@@ -31,12 +32,15 @@ public class semargl_external_tester
     public int delta = 1000;
     private TripleUtils tripleUtils = new TripleUtils();
     private MessageParser messageParser = new MessageParser();
+    public IMessagingManager mm;
+    //
     String host = "192.168.0.101"; //"itiu-desktop";
     Integer port = 5672;
     String virtualHost = "bigarchive";
     String userName = "ba";
     String password = "123456";
     long responceWaitingLimit = 10000;
+    boolean transport_zeromq = false;
 
     semargl_external_tester() throws Exception
     {
@@ -44,9 +48,18 @@ public class semargl_external_tester
 
     public void init() throws Exception
     {
-        mm = new AMQPMessagingManager();
 
-        mm.init(host, port, virtualHost, userName, password, responceWaitingLimit);
+        if (transport_zeromq == true)
+        {
+            ZMQMessagingManager zmmq = new ZMQMessagingManager();
+            zmmq.init("tcp://127.0.0.1:5555");
+            mm = (IMessagingManager) zmmq;
+        } else
+        {
+            AMQPMessagingManager amqpmq = new AMQPMessagingManager();
+            amqpmq.init(host, port, virtualHost, userName, password, responceWaitingLimit);
+            mm = (IMessagingManager) amqpmq;
+        }
     }
 
     /**
@@ -87,6 +100,11 @@ public class semargl_external_tester
                 {
                     autotest.host = args[i + 1];
                     System.out.println("message_service : " + autotest.host);
+                }
+                if (args[i].equals("-zeromq"))
+                {
+                    autotest.transport_zeromq = true;
+                    System.out.println("transport : -zeromq");
                 }
             }
         }
@@ -300,7 +318,7 @@ public class semargl_external_tester
                     if (count % 1000 == 0)
                     {
                         System.out.println("sleep 10s");
-                        Thread.currentThread().sleep(10000);
+//                        Thread.currentThread().sleep(10000);
                     }
 
                     if (count % delta == 0)
@@ -318,9 +336,10 @@ public class semargl_external_tester
                     }
 
 
+                } else
+                {
+                    throw new Exception("eth_result == null OR get_result == null");
                 }
-                else
-                    throw new Exception ("eth_result == null OR get_result == null");
             }
 
         } catch (Exception ex)

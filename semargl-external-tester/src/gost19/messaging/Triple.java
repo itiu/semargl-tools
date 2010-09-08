@@ -1,4 +1,4 @@
-package gost19.amqp.messaging;
+package gost19.messaging;
 
 public class Triple implements Comparable<Triple> {
 

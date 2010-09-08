@@ -1,4 +1,4 @@
-package gost19.amqp.messaging;
+package gost19.messaging;
 
 import gost19.Predicates;
 import java.util.Arrays;

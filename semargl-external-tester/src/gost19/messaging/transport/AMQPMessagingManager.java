@@ -1,4 +1,4 @@
-package gost19.amqp.messaging;
+package gost19.messaging.transport;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -13,8 +13,10 @@ import com.rabbitmq.client.QueueingConsumer;
 import com.rabbitmq.client.QueueingConsumer.Delivery;
 import com.rabbitmq.client.MessageProperties;
 import gost19.Predicates;
+import gost19.messaging.MessageParser;
+import gost19.messaging.TripleUtils;
 
-public class AMQPMessagingManager
+public class AMQPMessagingManager implements IMessagingManager
 {
 
     class Log
