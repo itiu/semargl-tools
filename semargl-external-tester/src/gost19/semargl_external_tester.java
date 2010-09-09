@@ -314,7 +314,7 @@ public class semargl_external_tester
 
                     if (count % 1000 == 0)
                     {
-                        System.out.println("sleep 10s");
+//                        System.out.println("sleep 10s");
 //                        Thread.currentThread().sleep(10000);
                     }
 
