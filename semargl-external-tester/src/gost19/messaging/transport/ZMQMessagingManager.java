@@ -85,45 +85,60 @@ public class ZMQMessagingManager implements IMessagingManager
 
         byte[] bb = (message + "\0").getBytes();
         s.send(bb, 0);
-        byte data[] = s.recv(0);
-        String r = new String(data);
 
-        List<String> replyTriples = messageParser.split(r);
-        if (replyTriples.size() > 0)
+        boolean first_loop = true;
+
+        while (!(isStatusOk || isStatusError))
         {
-            String replyUid = tripleUtils.getTripleFromLine(replyTriples.get(0)).getSubj();
-            if (replyUid.equals(uid))
+            byte data[];
+
+            if (first_loop)
             {
-                String status = tripleUtils.getStatusFromReply(r);
-//                log.debug(String.format("[%s] SEND_REQUEST [%s] : ...статус : %s", requestQueueName, uid, status));
-                if (status != null)
-                {
-                    if (status.equals(Predicates.STATE_OK))
-                    {
-                        isStatusOk = true;
-                    } else if (status.equals(Predicates.STATE_ERROR))
-                    {
-                        isStatusError = true;
-                    }
-                } else
-                {
-                    result.addAll(tripleUtils.getDataFromReply(r));
-                }
-
-//                log.debug(String.format("[%s] SEND_REQUEST [%s] : ...isStatusOk : %s", requestQueueName, uid, isStatusOk));
-                if (isStatusOk)
-                {
-                    result.addAll(tripleUtils.getDataFromReply(r));
-//                    log.debug(String.format("[%s] SEND_REQUEST [%s] : ...result : %s", requestQueueName, uid, result));
-                }
-
+                data = s.recv(0);
             } else
             {
-                //               log.warning(String.format("[%s] SEND_REQUEST [%s] : ...INVALID ANSWER UID! WAITING NEXT!", requestQueueName, uid));
-//                startWaiting += responceWaitingLimit;
+                data = s.recv(ZMQ.RCVMORE);
             }
-        } else
-        {
+
+            String r = new String(data);
+
+            List<String> replyTriples = messageParser.split(r);
+            if (replyTriples.size() > 0)
+            {
+                String replyUid = tripleUtils.getTripleFromLine(replyTriples.get(0)).getSubj();
+                if (replyUid.equals(uid))
+                {
+                    String status = tripleUtils.getStatusFromReply(r);
+//                log.debug(String.format("[%s] SEND_REQUEST [%s] : ...статус : %s", requestQueueName, uid, status));
+                    if (status != null)
+                    {
+                        if (status.equals(Predicates.STATE_OK))
+                        {
+                            isStatusOk = true;
+                        } else if (status.equals(Predicates.STATE_ERROR))
+                        {
+                            isStatusError = true;
+                        }
+                    } else
+                    {
+                        result.addAll(tripleUtils.getDataFromReply(r));
+                    }
+
+//                log.debug(String.format("[%s] SEND_REQUEST [%s] : ...isStatusOk : %s", requestQueueName, uid, isStatusOk));
+                    if (isStatusOk)
+                    {
+                        result.addAll(tripleUtils.getDataFromReply(r));
+//                    log.debug(String.format("[%s] SEND_REQUEST [%s] : ...result : %s", requestQueueName, uid, result));
+                    }
+
+                } else
+                {
+                    //               log.warning(String.format("[%s] SEND_REQUEST [%s] : ...INVALID ANSWER UID! WAITING NEXT!", requestQueueName, uid));
+//                startWaiting += responceWaitingLimit;
+                }
+            } else
+            {
+            }
         }
 
         return result;
