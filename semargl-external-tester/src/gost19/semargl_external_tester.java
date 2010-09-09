@@ -42,25 +42,6 @@ public class semargl_external_tester
     long responceWaitingLimit = 10000;
     boolean transport_zeromq = false;
 
-    semargl_external_tester() throws Exception
-    {
-    }
-
-    public void init() throws Exception
-    {
-
-        if (transport_zeromq == true)
-        {
-            ZMQMessagingManager zmmq = new ZMQMessagingManager();
-            zmmq.init("tcp://127.0.0.1:5555");
-            mm = (IMessagingManager) zmmq;
-        } else
-        {
-            AMQPMessagingManager amqpmq = new AMQPMessagingManager();
-            amqpmq.init(host, port, virtualHost, userName, password, responceWaitingLimit);
-            mm = (IMessagingManager) amqpmq;
-        }
-    }
 
     /**
      * @param args the command line arguments
@@ -121,6 +102,22 @@ public class semargl_external_tester
         }
 
         System.exit(0);
+    }
+
+    public void init() throws Exception
+    {
+
+        if (transport_zeromq == true)
+        {
+            ZMQMessagingManager zmmq = new ZMQMessagingManager();
+            zmmq.init("tcp://" + host + ":5555");
+            mm = (IMessagingManager) zmmq;
+        } else
+        {
+            AMQPMessagingManager amqpmq = new AMQPMessagingManager();
+            amqpmq.init(host, port, virtualHost, userName, password, responceWaitingLimit);
+            mm = (IMessagingManager) amqpmq;
+        }
     }
 
     private void load_messages_from_file() throws Exception

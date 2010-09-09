@@ -1,3 +1,3 @@
-java -Djava.library.path=/usr/local/lib -jar "dist/semargl-external-tester.jar" -message_service 127.0.0.1
+java -Djava.library.path=/usr/local/lib -jar "dist/semargl-external-tester.jar" -message_service 172.17.4.67
 # -zeromq
 #-n -rt0

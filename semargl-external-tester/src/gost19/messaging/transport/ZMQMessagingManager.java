@@ -59,6 +59,7 @@ public class ZMQMessagingManager implements IMessagingManager
         this.log = new Log();
         ZMQ.Context ctx = ZMQ.context(1);
         s = ctx.socket(ZMQ.REQ);
+        log.info("ZMQ:connect to: " + point);
         s.connect(point);
     }
 
@@ -67,8 +68,9 @@ public class ZMQMessagingManager implements IMessagingManager
      *
      * @throws IOException
      */
-    public void sendMessage(String to, String message, String queueToListen)
+    public void sendMessage(String to, String message, String queueToListen) throws Exception
     {
+        throw new Exception("not implemented");
     }
 
     /**
@@ -130,11 +132,9 @@ public class ZMQMessagingManager implements IMessagingManager
     /**
      * {@inheritDoc}
      */
-    public String getMessage(String queueToListen, int waitingTime)
+    public String getMessage(String queueToListen, int waitingTime) throws Exception
     {
-        return null;
-
-
+        throw new Exception("not implemented");
     }
 
     public void close()
@@ -142,46 +142,3 @@ public class ZMQMessagingManager implements IMessagingManager
     }
 }
 
-/*
-class remote_lat
-{
-public static void main (String [] args)
-{
-if (args.length != 3) {
-System.out.println ("usage: remote_lat <connect-to> " +
-"<message size> <roundtrip count>");
-return;
-}
-
-String connectTo = args [0];
-int messageSize = Integer.parseInt (args [1]);
-int roundtripCount = Integer.parseInt (args [2]);
-
-ZMQ.Context ctx = ZMQ.context (1);
-ZMQ.Socket s = ctx.socket (ZMQ.REQ);
-
-//  Add your socket options here.
-//  For example ZMQ_RATE, ZMQ_RECOVERY_IVL and ZMQ_MCAST_LOOP for PGM.
-
-s.connect (connectTo);
-
-long start = System.currentTimeMillis ();
-
-byte data [] = new byte [messageSize];
-for (int i = 0; i != roundtripCount; i ++) {
-s.send (data, 0);
-data = s.recv (0);
-assert (data.length == messageSize);
-}
-
-long end = System.currentTimeMillis ();
-
-long elapsed = (end - start) * 1000;
-double latency = (double) elapsed / roundtripCount / 2;
-
-System.out.println ("message size: " + messageSize + " [B]");
-System.out.println ("roundtrip count: " + roundtripCount);
-System.out.println ("mean latency: " + latency + " [us]");
-}
-}
- */
