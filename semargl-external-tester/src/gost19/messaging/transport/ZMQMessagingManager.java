@@ -100,6 +100,8 @@ public class ZMQMessagingManager implements IMessagingManager
                 data = s.recv(ZMQ.RCVMORE);
             }
 
+            first_loop = false;
+
             String r = new String(data);
 
             List<String> replyTriples = messageParser.split(r);

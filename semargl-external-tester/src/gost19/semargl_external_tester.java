@@ -249,7 +249,8 @@ public class semargl_external_tester
                     if (eth_result.size() != get_result.size())
                     {
                         System.out.println("et_result.size() != result.size()");
-                        return;
+                        throw new Exception ("et_result.size() != result.size()");
+ //                       return;
                     }
 
                     List<String> eth_elements = new ArrayList<String>();
